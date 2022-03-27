@@ -2,6 +2,7 @@ use ontour::Module;
 use log::{debug, info};
 use structopt::{clap::AppSettings, StructOpt};
 use std::path::PathBuf;
+use std::fs::read_to_string;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -20,9 +21,9 @@ struct CliOptions {
     #[structopt()]
     pub(crate) operation: String,
 
-    /// The data to pass to the operation
-    #[structopt()]
-    pub(crate) data: String,
+    /// The path to the JSON data to use as input.
+    #[structopt(parse(from_os_str))]
+    pub(crate) json_path: PathBuf,
 }
 
 // https://docs.rs/env_logger/0.9.0/env_logger/index.html#enabling-logging
@@ -62,7 +63,13 @@ fn run(options: CliOptions) -> anyhow::Result<String> {
     let module = Module::from_path(&options.file_path)?;
     info!("Module loaded");
 
-    let bytes = rmp_serde::to_vec(&options.data)?;
+    let json = read_to_string(options.json_path)?;
+    let data: serde_json::Value = serde_json::from_str(&json)?;
+    debug!("Data: {:?}", data);
+
+    let bytes = rmp_serde::to_vec(&data)?;
+
+    debug!("Running {} with payload: {:?}", options.operation, bytes);
     let result = module.run(&options.operation, &bytes)?;
     let unpacked: String = rmp_serde::from_read_ref(&result)?;
 
